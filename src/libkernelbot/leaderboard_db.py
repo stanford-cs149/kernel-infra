@@ -632,7 +632,7 @@ class LeaderboardDB:
                     s.submission_time,
                     r.score,
                     r.runner,
-                    ui.user_name,
+                    ui.nickname,
                     RANK() OVER (ORDER BY r.score ASC) as rank
                 FROM leaderboard.runs r
                 JOIN leaderboard.submission s ON r.submission_id = s.id
@@ -674,7 +674,7 @@ class LeaderboardDB:
                     bs.submission_time,
                     bs.score,
                     bs.runner,
-                    ui.user_name,
+                    ui.nickname,
                     RANK() OVER (ORDER BY bs.score ASC) as rank
                 FROM best_submissions bs
                 JOIN leaderboard.user_info ui ON bs.user_id = ui.id
@@ -952,7 +952,7 @@ class LeaderboardDB:
 
         return count
 
-    def init_user_from_cli(self, cli_id: str, auth_provider: str):
+    def init_user_from_cli(self, cli_id: str, auth_provider: str, sunet_id: str, nickname: str):
         """
         Initialize a user from CLI authentication flow.
         Checks if cli_id already exists, and if so returns an error.
@@ -969,27 +969,43 @@ class LeaderboardDB:
             raise Exception("Invalid auth provider")
 
         try:
-            # Check if cli_id already exists
+            # # Check if cli_id already exists
+            # self.cursor.execute(
+            #     """
+            #     SELECT 1 FROM leaderboard.user_info WHERE cli_id = %s
+            #     """,
+            #     (cli_id,),
+            # )
+            # if self.cursor.fetchone():
+            #     raise Exception("CLI ID already exists")
+
+            # Check if sunet_id already exists
             self.cursor.execute(
                 """
-                SELECT 1 FROM leaderboard.user_info WHERE cli_id = %s
+                SELECT cli_id, nickname FROM leaderboard.user_info WHERE sunet_id = %s
                 """,
-                (cli_id,),
+                (sunet_id,),
             )
-
-            if self.cursor.fetchone():
-                raise Exception("CLI ID already exists")
+            existing_user = self.cursor.fetchone()
+            
+            if existing_user:
+                # Return existing cli_id and nickname
+                existing_cli_id, existing_nickname = existing_user
+                logger.info("Found existing user with sunet_id %s", sunet_id)
+                return (existing_cli_id, existing_nickname)
 
             self.cursor.execute(
                 """
                 INSERT INTO leaderboard.user_info (id, user_name,
-                cli_id, cli_auth_provider, cli_valid)
-                VALUES (%s, %s, %s, %s, %s)
+                cli_id, cli_auth_provider, cli_valid, sunet_id, nickname)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (f"temp_{cli_id}", f"temp_user_{cli_id}", cli_id, auth_provider, False),
+                (f"temp_{cli_id}", f"temp_user_{cli_id}", cli_id, auth_provider, True, sunet_id, nickname),
             )
 
             self.connection.commit()
+
+            return (cli_id, nickname)
         except psycopg2.Error as e:
             self.connection.rollback()
             logger.exception("Error initializing user from CLI with ID %s", cli_id, exc_info=e)

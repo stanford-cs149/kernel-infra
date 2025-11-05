@@ -8,7 +8,7 @@ from dataclasses import asdict
 from typing import Annotated, Any, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from libkernelbot.backend import KernelBackend
 from libkernelbot.background_submission_manager import BackgroundSubmissionManager
@@ -28,6 +28,7 @@ from .api_utils import (
     _run_submission,
     to_submit_info,
 )
+from .visual_leaderboards import generate_simple_html
 
 logger = setup_logging(__name__)
 
@@ -166,7 +167,7 @@ async def validate_user_header(
 
 
 @app.get("/auth/init")
-async def auth_init(provider: str, db_context=Depends(get_db)) -> dict:
+async def auth_init(provider: str, sunet_id: str, nickname: str, db_context=Depends(get_db)) -> dict:
     if provider not in ["discord", "github"]:
         raise HTTPException(
             status_code=400, detail="Invalid provider, must be 'discord' or 'github'"
@@ -185,11 +186,11 @@ async def auth_init(provider: str, db_context=Depends(get_db)) -> dict:
     import uuid
 
     state_uuid = str(uuid.uuid4())
-
+    nickname_in_db = nickname
     try:
         with db_context as db:
             # Assuming init_user_from_cli exists and handles DB interaction
-            db.init_user_from_cli(state_uuid, provider)
+            state_uuid, nickname_in_db = db.init_user_from_cli(state_uuid, provider, sunet_id, nickname)
     except AttributeError as e:
         # Catch if leaderboard_db methods don't exist
         raise HTTPException(status_code=500, detail=f"Database interface error: {e}") from e
@@ -197,7 +198,7 @@ async def auth_init(provider: str, db_context=Depends(get_db)) -> dict:
         # Catch other potential errors during DB interaction
         raise HTTPException(status_code=500, detail=f"Failed to initialize auth in DB: {e}") from e
 
-    return {"state": state_uuid}
+    return {"state": state_uuid, "sunet_id": sunet_id, "nickname": nickname_in_db}
 
 
 @app.get("/auth/cli/{auth_provider}")
@@ -538,3 +539,35 @@ async def get_submission_count(
             return {"count": count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching submission count: {e}") from e
+
+# visual interface of leaderboard
+@app.get("/visual_leaderboards")
+async def visual_leaderboards(db_context=Depends(get_db)):
+    await simple_rate_limit()
+    try:
+        with db_context as db:
+            ldb_items = db.get_leaderboards()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching leaderboards: {e}") from e
+
+
+    leaderbaords = []
+    try:
+        with db_context as db:
+            for ldb_item in ldb_items:
+                ldb_name = ldb_item["name"]
+                ldb_gpu_types = ldb_item["gpu_types"]
+                for gpu_type in ldb_gpu_types:
+                    ldb_submissions = db.get_leaderboard_submissions(ldb_name, gpu_type)
+                    item = {
+                        "name": ldb_name,
+                        "gpu_type": gpu_type,
+                        "submissions": ldb_submissions
+                    }
+                    leaderbaords.append(item)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching leaderboards: {e}") from e
+
+    # Generate HTML from leaderboard data
+    html_content = generate_simple_html(leaderbaords)
+    return HTMLResponse(content=html_content)

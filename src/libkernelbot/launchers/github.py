@@ -61,7 +61,12 @@ class GitHubLauncher(Launcher):
         self, config: dict, gpu_type: GPU, status: RunProgressReporter
     ) -> FullResult:
         gpu_vendor = None
-        if gpu_type.value in ["MI300", "MI250", "MI300x8"]:
+        if gpu_type.value == "H100_Stanford":
+            selected_workflow = "test.yml"
+            selected_workflow = "test.yml"
+            gpu_vendor = "NVIDIA"
+            requirements = NVIDIA_REQUIREMENTS
+        elif gpu_type.value in ["MI300", "MI250", "MI300x8"]:
             selected_workflow = "amd_workflow.yml"
             runner_name = {
                 "MI300": "amdgpu-mi300-x86-64",
@@ -220,7 +225,9 @@ class GitHubRun:
 
         inputs_with_run_id = {**inputs, "run_id": run_id}
 
-        if self.workflow_file == "amd_workflow.yml":
+        if self.workflow_file == "test.yml":
+            expected_run_name = f"Stanford Job - {run_id}"
+        elif self.workflow_file == "amd_workflow.yml":
             expected_run_name = f"AMD Job - {run_id}"
         elif self.workflow_file == "nvidia_workflow.yml":
             expected_run_name = f"NVIDIA Job - {run_id}"
