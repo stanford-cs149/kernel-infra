@@ -108,6 +108,8 @@ class GitHubLauncher(Launcher):
 
         if not await run.trigger(inputs):
             raise RuntimeError("Failed to trigger GitHub Action. Please check the configuration.")
+        
+        await status.push(f"View live progress: {run.html_url}")
 
         await status.push("⏳ Waiting for workflow to start...")
         logger.info("Waiting for workflow to start...")
