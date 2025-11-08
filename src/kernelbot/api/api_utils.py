@@ -158,46 +158,28 @@ class MultiProgressReporterAPI(MultiProgressReporter):
 
     def make_message(self):
         return
-    
-    # 
-    def get_all_new_messages(self):
-          """Get all new messages from all runs"""
-          new_msgs = []
-          for run in self.runs:
-              new_msgs.extend(run.get_new_messages())
-          return new_msgs
-    # 
-
 
 class RunProgressReporterAPI(RunProgressReporter):
     def __init__(self, title: str):
         super().__init__(title=title)
         self.long_report = ""
         self.sent_messages = []  # NEW: Track what we've already sent
-        self.new_messages = []   # NEW: Track new messages to send
 
-    # async def _update_message(self):
-    #     pass
-    # 
     async def _update_message(self):
-          # This is called when the reporter updates
-          # Store only the NEW part of the message
-          current_msg = self.get_message()
-          # Check if there's new content
-          if current_msg not in self.sent_messages:
-              # Find the new part
-              self.new_messages.append(current_msg)
+        pass
 
     async def push(self, message: str):
         await super().push(message)
-        self.new_messages.append(message)
     
+    # 
     def get_new_messages(self):
-          """Get messages that haven't been sent yet"""
-          msgs = self.new_messages.copy()
-          self.new_messages.clear()
-          self.sent_messages.extend(msgs)
-          return msgs
+        """Get messages that haven't been sent yet"""
+        new_msgs = []
+        for msg in self.lines:
+            if msg not in self.sent_messages:
+                new_msgs.append(msg)
+                self.sent_messages.append(msg)
+        return new_msgs
     # 
 
     async def display_report(self, title: str, report: RunResultReport):
@@ -222,7 +204,6 @@ async def _run_submission(
     if len(req.gpus) != 1:
         raise HTTPException(status_code=400, detail="Invalid GPU type")
 
-    # reporter = MultiProgressReporterAPI()
     sub_id, results = await backend.submit_full(req, mode, reporter)
     return results, [rep.get_message() + "\n" + rep.long_report for rep in reporter.runs]
 

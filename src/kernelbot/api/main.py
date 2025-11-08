@@ -335,10 +335,6 @@ async def _stream_submission_response(
               if new_msgs:
                   for msg in new_msgs:
                       yield f"event: status\ndata: {json.dumps({'status': msg}, default=json_serializer)}\n\n"
-              else:
-                  # No new messages, send generic status
-                  yield f"event: status\ndata: {json.dumps({'status': 'processing', 'elapsed_time': 
-  round(elapsed_time, 2)}, default=json_serializer)}\n\n"
 
               try:
                   await asyncio.wait_for(asyncio.shield(task), timeout=2.0)
