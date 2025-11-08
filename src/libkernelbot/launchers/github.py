@@ -61,8 +61,11 @@ class GitHubLauncher(Launcher):
         self, config: dict, gpu_type: GPU, status: RunProgressReporter
     ) -> FullResult:
         gpu_vendor = None
-        if gpu_type.value == "H100_Stanford":
+        if gpu_type.value == "L40S":
             selected_workflow = "test.yml"
+            gpu_vendor = "NVIDIA"
+            requirements = NVIDIA_REQUIREMENTS
+        elif gpu_type.value == "H100":
             selected_workflow = "test.yml"
             gpu_vendor = "NVIDIA"
             requirements = NVIDIA_REQUIREMENTS

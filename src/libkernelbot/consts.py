@@ -17,21 +17,24 @@ class SchedulerType(Enum):
 
 
 class GitHubGPU(Enum):
-    NVIDIA = "NVIDIA"
-    MI300 = "MI300"
-    MI250 = "MI250"
-    MI300x8 = "MI300x8"
-    H100_Stanford = "H100_Stanford"
+    # NVIDIA = "NVIDIA"
+    # MI300 = "MI300"
+    # MI250 = "MI250"
+    # MI300x8 = "MI300x8"
+    # H100_Stanford = "H100_Stanford"
+    H100 = "H100"
+    L40S = "L40S"
 
 
 class ModalGPU(Enum):
-    T4 = "T4"
-    L4 = "L4"
-    A100 = "A100"
-    H100 = "H100"
-    B200 = "B200"
+    pass
+    # T4 = "T4"
+    # L4 = "L4"
+    # A100 = "A100"
+    # H100 = "H100"
+    # B200 = "B200"
     # multi-gpu
-    L4x4 = "L4x4"
+    # L4x4 = "L4x4"
 
 
 @dataclasses.dataclass
@@ -122,7 +125,9 @@ GPU_TO_SM = {
     "MI300": None,
     "MI300x8": None,
     "MI250": None,
-    "H100_Stanford": "90a",
+    # "H100_Stanford": "90a",
+    "L40S": "89"
+
 }
 
 
