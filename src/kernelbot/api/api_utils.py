@@ -18,6 +18,7 @@ from libkernelbot.submission import (
     SubmissionRequest,
     prepare_submission,
 )
+import asyncio
 
 
 async def _handle_discord_oauth(code: str, redirect_uri: str) -> tuple[str, str]:
@@ -142,9 +143,12 @@ async def _handle_github_oauth(code: str, redirect_uri: str) -> tuple[str, str]:
     return user_id, user_name
 
 
+# async def _run_submission(
+#     submission: SubmissionRequest, mode: SubmissionMode, backend: KernelBackend
+# ):
 async def _run_submission(
-    submission: SubmissionRequest, mode: SubmissionMode, backend: KernelBackend
-):
+    submission: SubmissionRequest, mode: SubmissionMode, backend: KernelBackend, message_queue: asyncio.Queue
+  ):
     try:
         req = prepare_submission(submission, backend)
     except Exception as e:
@@ -153,34 +157,55 @@ async def _run_submission(
     if len(req.gpus) != 1:
         raise HTTPException(status_code=400, detail="Invalid GPU type")
 
-    reporter = MultiProgressReporterAPI()
+    # reporter = MultiProgressReporterAPI()
+    reporter = MultiProgressReporterAPI(message_queue)  # Pass the queue
     sub_id, results = await backend.submit_full(req, mode, reporter)
     return results, [rep.get_message() + "\n" + rep.long_report for rep in reporter.runs]
 
 
 class MultiProgressReporterAPI(MultiProgressReporter):
-    def __init__(self):
+    # def __init__(self):
+    def __init__(self, message_queue: asyncio.Queue):
         self.runs = []
+        self.message_queue = message_queue
 
     async def show(self, title: str):
         return
 
+    # def add_run(self, title: str) -> "RunProgressReporterAPI":
+    #     rep = RunProgressReporterAPI(title)
+    #     self.runs.append(rep)
+    #     return rep
+    # 
     def add_run(self, title: str) -> "RunProgressReporterAPI":
-        rep = RunProgressReporterAPI(title)
-        self.runs.append(rep)
-        return rep
+          rep = RunProgressReporterAPI(title, self.message_queue)
+          self.runs.append(rep)
+          return rep
+    # 
 
     def make_message(self):
         return
 
 
 class RunProgressReporterAPI(RunProgressReporter):
-    def __init__(self, title: str):
+    # def __init__(self, title: str):
+    def __init__(self, title: str, message_queue: asyncio.Queue):
         super().__init__(title=title)
         self.long_report = ""
+        self.message_queue = message_queue  # NEW
 
+    # async def _update_message(self):
+    #     pass
+    # 
     async def _update_message(self):
-        pass
+        # Stream the current message to the queue
+        message = self.get_message()
+        await self.message_queue.put({"type": "status", "message": message})
+
+    async def push(self, message: str):
+        await super().push(message)
+        await self.message_queue.put({"type": "status", "message": message})
+    # 
 
     async def display_report(self, title: str, report: RunResultReport):
         for part in report.data:

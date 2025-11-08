@@ -288,12 +288,22 @@ async def _stream_submission_response(
 ):
     start_time = time.time()
     task: asyncio.Task | None = None
+    message_queue = asyncio.Queue()  # NEW
+
     try:
+        # task = asyncio.create_task(
+        #     _run_submission(
+        #         submission_request,
+        #         submission_mode_enum,
+        #         backend,
+        #     )
+        # )
         task = asyncio.create_task(
             _run_submission(
                 submission_request,
                 submission_mode_enum,
                 backend,
+                message_queue,  # Pass the queue
             )
         )
 
@@ -303,10 +313,23 @@ async def _stream_submission_response(
                                                       'elapsed_time': round(elapsed_time, 2)},
                                                       default=json_serializer)}\n\n"
 
+            # try:
+            #     await asyncio.wait_for(asyncio.shield(task), timeout=15.0)
+            # except asyncio.TimeoutError:
+            #     continue
+            # Check for messages from the reporter
+            # 
             try:
-                await asyncio.wait_for(asyncio.shield(task), timeout=15.0)
+                message = await asyncio.wait_for(message_queue.get(), timeout=1.0)
+                # Stream the actual status message
+                yield f"event: status\ndata: {json.dumps({'status': message['message'], 'elapsed_time': 
+round(elapsed_time, 2)}, default=json_serializer)}\n\n"
             except asyncio.TimeoutError:
-                continue
+                # No new messages, send generic processing update
+                yield f"event: status\ndata: {json.dumps({'status': 'processing', 'elapsed_time': 
+round(elapsed_time, 2)}, default=json_serializer)}\n\n"
+            # 
+                  
             except asyncio.CancelledError:
                 yield f"event: error\ndata: {json.dumps(
                     {'status': 'error', 'detail': 'Submission cancelled'},
