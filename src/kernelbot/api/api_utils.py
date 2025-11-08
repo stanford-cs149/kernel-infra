@@ -143,56 +143,36 @@ async def _handle_github_oauth(code: str, redirect_uri: str) -> tuple[str, str]:
     return user_id, user_name
 
 
-# async def _run_submission(
-#     submission: SubmissionRequest, mode: SubmissionMode, backend: KernelBackend
-# ):
-async def _run_submission(
-    submission: SubmissionRequest, mode: SubmissionMode, backend: KernelBackend, message_queue: asyncio.Queue
-  ):
-    try:
-        req = prepare_submission(submission, backend)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-    if len(req.gpus) != 1:
-        raise HTTPException(status_code=400, detail="Invalid GPU type")
-
-    # reporter = MultiProgressReporterAPI()
-    reporter = MultiProgressReporterAPI(message_queue)  # Pass the queue
-    sub_id, results = await backend.submit_full(req, mode, reporter)
-    return results, [rep.get_message() + "\n" + rep.long_report for rep in reporter.runs]
-
-
 class MultiProgressReporterAPI(MultiProgressReporter):
-    # def __init__(self):
-    def __init__(self, message_queue: asyncio.Queue):
+    def __init__(self):
         self.runs = []
-        self.message_queue = message_queue
 
     async def show(self, title: str):
         return
 
-    # def add_run(self, title: str) -> "RunProgressReporterAPI":
-    #     rep = RunProgressReporterAPI(title)
-    #     self.runs.append(rep)
-    #     return rep
-    # 
     def add_run(self, title: str) -> "RunProgressReporterAPI":
-          rep = RunProgressReporterAPI(title, self.message_queue)
-          self.runs.append(rep)
-          return rep
-    # 
+        rep = RunProgressReporterAPI(title)
+        self.runs.append(rep)
+        return rep
+    
 
     def make_message(self):
         return
+    
+    # 
+    def get_all_new_messages(self):
+          """Get all new messages from all runs"""
+          new_msgs = []
+          for run in self.runs:
+              new_msgs.extend(run.get_new_messages())
+          return new_msgs
+    # 
 
 
 class RunProgressReporterAPI(RunProgressReporter):
-    # def __init__(self, title: str):
-    def __init__(self, title: str, message_queue: asyncio.Queue):
+    def __init__(self, title: str):
         super().__init__(title=title)
         self.long_report = ""
-        # self.message_queue = message_queue  # NEW
         self.sent_messages = []  # NEW: Track what we've already sent
         self.new_messages = []   # NEW: Track new messages to send
 
@@ -227,6 +207,25 @@ class RunProgressReporterAPI(RunProgressReporter):
             elif isinstance(part, Log):
                 self.long_report += f"\n\n## {part.header}:\n"
                 self.long_report += f"```\n{part.content}```"
+
+# async def _run_submission(
+#     submission: SubmissionRequest, mode: SubmissionMode, backend: KernelBackend
+# ):
+async def _run_submission(
+    submission: SubmissionRequest, mode: SubmissionMode, backend: KernelBackend, reporter: MultiProgressReporterAPI
+  ):
+    try:
+        req = prepare_submission(submission, backend)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    if len(req.gpus) != 1:
+        raise HTTPException(status_code=400, detail="Invalid GPU type")
+
+    # reporter = MultiProgressReporterAPI()
+    sub_id, results = await backend.submit_full(req, mode, reporter)
+    return results, [rep.get_message() + "\n" + rep.long_report for rep in reporter.runs]
+
 # ruff: noqa: C901
 async def to_submit_info(
     user_info: Any,
