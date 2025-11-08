@@ -27,6 +27,7 @@ from .api_utils import (
     _handle_github_oauth,
     _run_submission,
     to_submit_info,
+    MultiProgressReporterAPI,
 )
 from .visual_leaderboards import generate_simple_html
 
@@ -288,7 +289,7 @@ async def _stream_submission_response(
 ):
     start_time = time.time()
     task: asyncio.Task | None = None
-    message_queue = asyncio.Queue()  # NEW
+    reporter = MultiProgressReporterAPI()
 
     try:
         # task = asyncio.create_task(
@@ -303,38 +304,47 @@ async def _stream_submission_response(
                 submission_request,
                 submission_mode_enum,
                 backend,
-                message_queue,  # Pass the queue
+                reporter,
             )
         )
 
-        while not task.done():
-            elapsed_time = time.time() - start_time
-            yield f"event: status\ndata: {json.dumps({'status': 'processing',
-                                                      'elapsed_time': round(elapsed_time, 2)},
-                                                      default=json_serializer)}\n\n"
+        # while not task.done():
+        #     elapsed_time = time.time() - start_time
+        #     yield f"event: status\ndata: {json.dumps({'status': 'processing',
+        #                                               'elapsed_time': round(elapsed_time, 2)},
+        #                                               default=json_serializer)}\n\n"
 
-            # try:
-            #     await asyncio.wait_for(asyncio.shield(task), timeout=15.0)
-            # except asyncio.TimeoutError:
-            #     continue
-            # Check for messages from the reporter
-            # 
-            try:
-                message = await asyncio.wait_for(message_queue.get(), timeout=1.0)
-                # Stream the actual status message
-                yield f"event: status\ndata: {json.dumps({'status': message['message'], 'elapsed_time': 
-round(elapsed_time, 2)}, default=json_serializer)}\n\n"
-            except asyncio.TimeoutError:
-                # No new messages, send generic processing update
-                yield f"event: status\ndata: {json.dumps({'status': 'processing', 'elapsed_time': 
-round(elapsed_time, 2)}, default=json_serializer)}\n\n"
-            # 
-                  
-            except asyncio.CancelledError:
-                yield f"event: error\ndata: {json.dumps(
-                    {'status': 'error', 'detail': 'Submission cancelled'},
-                    default=json_serializer)}\n\n"
-                return
+        #     try:
+        #         await asyncio.wait_for(asyncio.shield(task), timeout=15.0)
+        #     except asyncio.TimeoutError:
+        #         continue
+        #     except asyncio.CancelledError:
+        #         yield f"event: error\ndata: {json.dumps(
+        #             {'status': 'error', 'detail': 'Submission cancelled'},
+        #             default=json_serializer)}\n\n"
+        #         return
+        while not task.done():
+              elapsed_time = time.time() - start_time
+
+              # Check for new messages from the reporter
+              new_msgs = []
+              for run in reporter.runs:
+                  new_msgs.extend(run.get_new_messages())
+
+              # Send new messages if any
+              if new_msgs:
+                  for msg in new_msgs:
+                      yield f"event: status\ndata: {json.dumps({'status': msg}, default=json_serializer)}\n\n"
+              else:
+                  # No new messages, send generic status
+                  yield f"event: status\ndata: {json.dumps({'status': 'processing', 'elapsed_time': 
+  round(elapsed_time, 2)}, default=json_serializer)}\n\n"
+
+              try:
+                  await asyncio.wait_for(asyncio.shield(task), timeout=2.0)
+              except asyncio.TimeoutError:
+                  continue
+            
 
         result, reports = await task
         result_data = {

@@ -192,19 +192,32 @@ class RunProgressReporterAPI(RunProgressReporter):
     def __init__(self, title: str, message_queue: asyncio.Queue):
         super().__init__(title=title)
         self.long_report = ""
-        self.message_queue = message_queue  # NEW
+        # self.message_queue = message_queue  # NEW
+        self.sent_messages = []  # NEW: Track what we've already sent
+        self.new_messages = []   # NEW: Track new messages to send
 
     # async def _update_message(self):
     #     pass
     # 
     async def _update_message(self):
-        # Stream the current message to the queue
-        message = self.get_message()
-        await self.message_queue.put({"type": "status", "message": message})
+          # This is called when the reporter updates
+          # Store only the NEW part of the message
+          current_msg = self.get_message()
+          # Check if there's new content
+          if current_msg not in self.sent_messages:
+              # Find the new part
+              self.new_messages.append(current_msg)
 
     async def push(self, message: str):
         await super().push(message)
-        await self.message_queue.put({"type": "status", "message": message})
+        self.new_messages.append(message)
+    
+    def get_new_messages(self):
+          """Get messages that haven't been sent yet"""
+          msgs = self.new_messages.copy()
+          self.new_messages.clear()
+          self.sent_messages.extend(msgs)
+          return msgs
     # 
 
     async def display_report(self, title: str, report: RunResultReport):
