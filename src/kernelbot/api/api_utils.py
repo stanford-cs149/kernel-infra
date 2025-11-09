@@ -229,16 +229,18 @@ async def to_submit_info(
             detail=f"Invalid submission mode value: '{submission_mode}'",
         ) from None
 
-    if submission_mode_enum in [SubmissionMode.PROFILE]:
-        raise HTTPException(
-            status_code=400,
-            detail="Profile submissions are not currently supported via API",
-        )
+    # if submission_mode_enum in [SubmissionMode.PROFILE]:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail="Profile submissions are not currently supported via API",
+    #     )
 
     allowed_modes = [
         SubmissionMode.TEST,
         SubmissionMode.BENCHMARK,
         SubmissionMode.LEADERBOARD,
+
+        SubmissionMode.PROFILE,
     ]
     if submission_mode_enum not in allowed_modes:
         raise HTTPException(

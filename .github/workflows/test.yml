@@ -55,6 +55,9 @@ jobs:
         pip install -e .
 
     - name: Run script
+      env:
+        LD_PRELOAD: /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+        PYTHONPATH: /usr/local/cuda-12.9/nsight-compute-2025.2.1/extras/python
       shell: bash
       run: |
         python3 src/runners/github-runner.py
