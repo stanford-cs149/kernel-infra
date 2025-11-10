@@ -155,6 +155,7 @@ torch
 setuptools
 ninja
 triton
+git+https://github.com/microsoft/Tilelang.git
 """
 
 AMD_REQUIREMENTS = """
