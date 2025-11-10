@@ -83,20 +83,20 @@ class KernelBackend:
                 for gpu in selected_gpus
             ]
 
-            if mode == SubmissionMode.LEADERBOARD:
-                tasks += [
-                    self.submit_leaderboard(
-                        sub_id,
-                        req.code,
-                        req.file_name,
-                        gpu,
-                        reporter.add_run(f"{gpu.name} on {gpu.runner} (secret)"),
-                        req.task,
-                        SubmissionMode.PRIVATE,
-                        req.secret_seed,
-                    )
-                    for gpu in selected_gpus
-                ]
+            # if mode == SubmissionMode.LEADERBOARD:
+            #     tasks += [
+            #         self.submit_leaderboard(
+            #             sub_id,
+            #             req.code,
+            #             req.file_name,
+            #             gpu,
+            #             reporter.add_run(f"{gpu.name} on {gpu.runner} (secret)"),
+            #             req.task,
+            #             SubmissionMode.PRIVATE,
+            #             req.secret_seed,
+            #         )
+            #         for gpu in selected_gpus
+            #     ]
             await reporter.show(
                 f"Submission **{sub_id}**: `{req.file_name}` for `{req.leaderboard}`"
             )
