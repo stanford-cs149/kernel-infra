@@ -117,9 +117,19 @@ class GitHubLauncher(Launcher):
         timeout = get_timeout(config) + TIMEOUT_BUFFER_MINUTES
 
         logger.info(f"Waiting for workflow to complete... (timeout: {timeout} minutes)")
-        await run.wait_for_completion(
-            lambda x: self.wait_callback(x, status), timeout_minutes=timeout
-        )
+        # await run.wait_for_completion(
+        #     lambda x: self.wait_callback(x, status), timeout_minutes=timeout
+        # )
+        try:
+            await run.wait_for_completion(
+                lambda x: self.wait_callback(x, status), timeout_minutes=timeout
+            )
+        except asyncio.CancelledError:
+            logger.info(f"Cancelling workflow {run.run_id} due to interruption...")
+            if run.run is not None:
+                await asyncio.to_thread(run.run.cancel)  # ← This is the PyGithub method
+            raise
+
         await status.update(f"Workflow [{run.run_id}](<{run.html_url}>) completed")
         logger.info(f"Workflow [{run.run_id}]({run.html_url}) completed")
         await status.push("Downloading artifacts...")
@@ -169,9 +179,17 @@ class GitHubLauncher(Launcher):
         return FullResult(success=True, error="", runs=runs, system=system)
 
     async def wait_callback(self, run: "GitHubRun", status: RunProgressReporter):
+        # await status.update(
+        #     f"⏳ Workflow [{run.run_id}](<{run.html_url}>): {run.status} "
+        #     f"({run.elapsed_time.total_seconds():.1f}s)"
+        # )
+        if run.elapsed_time is not None:
+            time_str = f"({run.elapsed_time.total_seconds():.1f}s)"
+        else:
+            time_str = "(queued)"
+
         await status.update(
-            f"⏳ Workflow [{run.run_id}](<{run.html_url}>): {run.status} "
-            f"({run.elapsed_time.total_seconds():.1f}s)"
+            f"⏳ Workflow [{run.run_id}](<{run.html_url}>): {run.status} {time_str}"
         )
 
 
@@ -322,7 +340,9 @@ class GitHubRun:
         if self.run is None:
             raise ValueError("Run needs to be triggered before a status check!")
 
-        self.start_time = datetime.datetime.now(datetime.timezone.utc)
+        # self.start_time = datetime.datetime.now(datetime.timezone.utc)
+        self.start_time = None
+
         timeout = datetime.timedelta(minutes=timeout_minutes)
 
         while True:
@@ -330,7 +350,14 @@ class GitHubRun:
                 run_update = await asyncio.to_thread(self.repo.get_workflow_run, self.run_id)
                 self.run = run = run_update
 
-                if self.elapsed_time > timeout:
+                # Start timer when workflow actually starts running
+                if self.start_time is None and run.status == "in_progress":
+                    self.start_time = datetime.datetime.now(datetime.timezone.utc)
+                    logger.info(f"Workflow {self.run_id} started running")
+
+                # Only check timeout if workflow has started running
+                if self.start_time is not None and self.elapsed_time > timeout:
+                # if self.elapsed_time > timeout:
                     try:
                         self.run.cancel()
                         # Wait briefly to ensure cancellation is processed
