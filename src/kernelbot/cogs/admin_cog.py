@@ -177,7 +177,8 @@ class AdminCog(commands.Cog):
         definition = make_task_definition(directory)
 
         # clearly mark this leaderboard as development-only
-        leaderboard_name = directory.name + "-dev"
+        # leaderboard_name = directory.name + "-dev"
+        leaderboard_name = directory.name
 
         # create-local overwrites existing leaderboard
         with self.bot.leaderboard_db as db:

@@ -92,7 +92,7 @@ def generate_simple_html(leaderboard_data: List[dict]) -> str:
 
         html += f"""
     <div class="leaderboard">
-        <h2>{name} - {gpu_type}</h2>
+        <h2>{name}</h2>
 """
 
         if not submissions:
