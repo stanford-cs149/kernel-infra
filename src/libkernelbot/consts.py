@@ -23,7 +23,7 @@ class GitHubGPU(Enum):
     # MI300x8 = "MI300x8"
     # H100_Stanford = "H100_Stanford"
     H100 = "H100"
-    L40S = "L40S"
+    # L40S = "L40S"
 
 
 class ModalGPU(Enum):
