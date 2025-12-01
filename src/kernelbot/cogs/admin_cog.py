@@ -186,7 +186,7 @@ class AdminCog(commands.Cog):
                 old_lb = db.get_leaderboard(leaderboard_name)
             except LeaderboardDoesNotExist:
                 old_lb = None
-            db.delete_leaderboard(leaderboard_name, force=True)
+            # db.delete_leaderboard(leaderboard_name, force=True)
 
         # get existing forum thread or create new one
         forum_channel = self.bot.get_channel(self.bot.leaderboard_forum_id)
@@ -205,18 +205,31 @@ class AdminCog(commands.Cog):
         else:
             await forum_thread.send("Leaderboard was updated")
 
-        if await self.create_leaderboard_in_db(
-            interaction,
-            leaderboard_name,
-            datetime.now(timezone.utc) + timedelta(days=365),
-            definition=definition,
-            forum_id=forum_id,
-            gpu=gpu.value if gpu else None,
-        ):
-            await send_discord_message(
+        if old_lb:
+            if await self.update_leaderboard_in_db(
                 interaction,
-                f"Leaderboard '{leaderboard_name}' created.",
-            )
+                leaderboard_name,
+                datetime.now(timezone.utc) + timedelta(days=365),
+                definition=definition
+            ):
+                await send_discord_message(
+                    interaction,
+                    f"Leaderboard '{leaderboard_name}' updated.",
+                )
+        else:
+            if await self.create_leaderboard_in_db(
+                interaction,
+                leaderboard_name,
+                datetime.now(timezone.utc) + timedelta(days=365),
+                definition=definition,
+                forum_id=forum_id,
+                gpu=gpu.value if gpu else None,
+            ):
+                await send_discord_message(
+                    interaction,
+                    f"Leaderboard '{leaderboard_name}' created.",
+                )
+            
 
     def _parse_deadline(self, deadline: str):
         # Try parsing with time first
@@ -366,6 +379,38 @@ class AdminCog(commands.Cog):
                     gpu_types=selected_gpus,
                     creator_id=interaction.user.id,
                     forum_id=forum_id,
+                )
+            except KernelBotError as e:
+                await send_discord_message(
+                    interaction,
+                    str(e),
+                    ephemeral=True,
+                )
+                return False
+            return True
+    
+    async def update_leaderboard_in_db(
+        self,
+        interaction: discord.Interaction,
+        leaderboard_name: str,
+        date_value: datetime,
+        definition: LeaderboardDefinition
+    ) -> bool:
+
+        with self.bot.leaderboard_db as db:
+            try:
+                # db.create_leaderboard(
+                #     name=leaderboard_name,
+                #     deadline=date_value,
+                #     definition=definition,
+                #     gpu_types=selected_gpus,
+                #     creator_id=interaction.user.id,
+                #     forum_id=forum_id,
+                # )
+                db.update_leaderboard(
+                    name=leaderboard_name,
+                    deadline=date_value,
+                    definition=definition
                 )
             except KernelBotError as e:
                 await send_discord_message(
